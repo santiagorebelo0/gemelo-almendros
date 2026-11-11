@@ -593,7 +593,7 @@ const CERO = new THREE.Matrix4().makeScale(0, 0, 0);
 
 function cuadro(ahora) {
   requestAnimationFrame(cuadro);
-  const dtr = Math.min(0.1, (ahora - previo) / 1000); previo = ahora;
+  const dtr = Math.max(0, Math.min(0.1, (ahora - previo) / 1000)); previo = ahora;   // nunca negativo: el primer cuadro puede traer una marca anterior
   let dts = 0;
   if (corriendo && !arrastrando) { dts = dtr * velocidad; tSim += dts; if (tSim >= H) { tSim = H; corriendo = false; marcar(); } }
   const t = tSim;
