@@ -3,6 +3,9 @@
 Proyecto final de Teoría de Probabilidades (Pontificia Universidad Javeriana Cali).
 Néstor Acosta, José Luis Canchala y José Santiago Rebelo.
 
+- Tablero Streamlit en línea: https://gemelo-almendros.streamlit.app
+- Tablero Shiny desde R: `shiny::runGitHub("gemelo-almendros", "santiagorebelo0")`
+
 Simula la entrada y la ocupación del parqueadero Almendros entre las 5:00 y las 12:00 de un
 día hábil, y lo muestra en un tablero con una escena 3D animada. El mismo modelo está en dos
 versiones que comparten parámetros, plano y escena:
@@ -99,6 +102,11 @@ source("herramientas/desplegar_shiny.R")
 
 Queda en `https://TU-CUENTA.shinyapps.io/gemelo-almendros/`. Para actualizarla después de un
 cambio, vuelve a ejecutar el paso 3.
+
+Alternativa sin token: en https://connect.posit.cloud se inicia sesión con GitHub, se elige
+**Publish → Shiny**, este repositorio y el archivo `app.R`. Usa el `manifest.json` del repositorio
+y se actualiza con cada `git push`. Si cambian los paquetes de R, se regenera con
+`rsconnect::writeManifest()`.
 
 ## Ajustar el plano 3D
 
