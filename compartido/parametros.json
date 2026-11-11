@@ -1,0 +1,27 @@
+{
+  "_nota": "Parametros por defecto del gemelo digital. Los leen por igual la version en Python (Streamlit) y la version en R (Shiny).",
+  "horario": { "inicio_h": 5, "fin_h": 12 },
+  "franjas": [
+    { "nombre": "5:00 a 8:00", "inicio_h": 5, "fin_h": 8, "lambda15": 13.3 },
+    { "nombre": "8:00 a 11:00", "inicio_h": 8, "fin_h": 11, "lambda15": 11.8 },
+    { "nombre": "11:00 a 12:00", "inicio_h": 11, "fin_h": 12, "lambda15": 5.2 }
+  ],
+  "_nota_dias": "Factor por dia = conteo del dia en la franja / promedio de lunes a viernes en esa franja, Tabla 1 de Varela et al. (2023). Franjas de la encuesta: 5y7, 8y10, 11y1.",
+  "tabla1_varela": {
+    "dias": ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"],
+    "5y7": [19, 22, 31, 16, 30],
+    "8y10": [33, 16, 16, 19, 21],
+    "11y1": [9, 13, 9, 12, 3]
+  },
+  "_nota_literatura": "Permanencia: Gamma con la media (7 h) y la desviacion (2,9 h, CV 0,41) de la Uniforme(2 h, 12 h) que usan Iguaran et al. (2019). Desvio: Tabla 2 del mismo estudio, columna «No hay en CDL» (el parqueadero de la Calle 17a); Ceibas no existia en ese estudio.",
+  "capacidad": 230,
+  "capacidad_min": 150,
+  "capacidad_max": 276,
+  "talanquera": { "media_s": 12, "cv": 0.5 },
+  "permanencia": { "activa": true, "media_h": 7.0, "cv": 0.4 },
+  "busqueda": { "velocidad_kmh": 10, "maniobra_s": 15 },
+  "desvio": { "Gualanday": 0.78, "Central": 0.22, "Ceibas": 0.0 },
+  "replicas": 500,
+  "semilla": 2026,
+  "hora_referencia_h": 9.0
+}

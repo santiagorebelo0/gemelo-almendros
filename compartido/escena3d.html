@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gemelo 3D Almendros</title>
+<style>
+  :root { --tinta:#f8fafc; --tenue:#cbd5e1; --panel:rgba(15,23,42,.74); --borde:rgba(148,163,184,.28);
+          --acento:#38bdf8; --ok:#4ade80; --alerta:#fbbf24; --lleno:#f87171; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#0f172a;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:var(--tinta); }
+  #lienzo { position:absolute; inset:0; }
+  #lienzo canvas { display:block; }
+  .panel { position:absolute; background:var(--panel); border:1px solid var(--borde); border-radius:12px;
+    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); padding:10px 14px; }
+  #hud-izq { top:12px; left:12px; }
+  .marca { font-size:13px; font-weight:600; letter-spacing:.02em; }
+  .sub { font-size:11px; color:var(--tenue); margin-top:1px; }
+  .reloj { font-size:34px; font-weight:700; line-height:1.05; margin-top:4px; font-variant-numeric:tabular-nums; }
+  #hud-der { top:12px; right:12px; width:236px; }
+  .renglon { display:flex; justify-content:space-between; align-items:baseline; font-size:12px; color:var(--tenue); }
+  .renglon b { font-size:17px; color:var(--tinta); font-variant-numeric:tabular-nums; }
+  .barra { height:8px; border-radius:99px; background:rgba(148,163,184,.25); margin:6px 0 10px; overflow:hidden; }
+  .barra i { display:block; height:100%; width:0; background:var(--ok); border-radius:99px; transition:background .3s; }
+  .tres { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; text-align:center; }
+  .tres b { display:block; font-size:19px; font-variant-numeric:tabular-nums; }
+  .tres span { font-size:10.5px; color:var(--tenue); }
+  .dest { margin-top:8px; padding-top:7px; border-top:1px solid var(--borde); font-size:11px; color:var(--tenue);
+    display:flex; justify-content:space-between; gap:6px; font-variant-numeric:tabular-nums; }
+  .dest b { color:var(--tinta); }
+  #controles { left:12px; right:12px; bottom:12px; display:flex; align-items:center; gap:10px; padding:8px 12px; }
+  button, select { font:inherit; font-size:12px; color:var(--tinta); background:rgba(148,163,184,.16);
+    border:1px solid var(--borde); border-radius:8px; padding:6px 10px; cursor:pointer; }
+  button:hover, select:hover { background:rgba(148,163,184,.3); }
+  button:focus-visible, select:focus-visible { outline:2px solid var(--acento); outline-offset:1px; }
+  select option { color:#0f172a; }
+  #play { width:38px; font-size:14px; padding:6px 0; }
+  #linea { flex:1; min-width:80px; height:46px; cursor:pointer; touch-action:none; }
+  .camaras { display:flex; gap:4px; }
+  .camaras button.activa { background:var(--acento); color:#082f49; border-color:transparent; font-weight:600; }
+  #aviso { position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center;
+    padding:24px; font-size:14px; color:var(--tenue); }
+  @media (max-width:640px) {
+    #hud-der { width:176px; padding:8px 10px; } .reloj { font-size:26px; }
+    .camaras button { padding:6px 7px; } #controles { gap:6px; flex-wrap:wrap; } #linea { order:5; flex-basis:100%; }
+  }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="lienzo"></div>
+<div id="aviso">No fue posible cargar la escena 3D. Ejecuta la simulación y verifica la conexión a internet (la librería Three.js se descarga de un CDN).</div>
+
+<div id="hud-izq" class="panel">
+  <div class="marca">Parqueadero Almendros</div>
+  <div class="sub" id="titulo">Gemelo digital</div>
+  <div class="reloj" id="reloj">5:00</div>
+</div>
+
+<div id="hud-der" class="panel">
+  <div class="renglon"><span>Ocupación</span><b id="ocup">0 / 0</b></div>
+  <div class="barra"><i id="barra"></i></div>
+  <div class="tres">
+    <div><b id="libres">0</b><span>Libres</span></div>
+    <div><b id="enfila">0</b><span>En la entrada</span></div>
+    <div><b id="desv">0</b><span>Desviados</span></div>
+  </div>
+  <div class="dest" id="dest"></div>
+</div>
+
+<div id="controles" class="panel">
+  <button id="play" title="Reproducir o pausar (barra espaciadora)" aria-label="Reproducir o pausar">❚❚</button>
+  <select id="vel" title="Velocidad de la simulación" aria-label="Velocidad de la simulación">
+    <option value="10">×10</option>
+    <option value="60">×60</option>
+    <option value="120" selected>×120</option>
+    <option value="300">×300</option>
+    <option value="600">×600</option>
+  </select>
+  <canvas id="linea" title="Ocupación del día. Clic o arrastre para mover la hora"></canvas>
+  <div class="camaras">
+    <button data-cam="general" class="activa">General</button>
+    <button data-cam="entrada">Entrada</button>
+    <button data-cam="cenital">Cenital</button>
+  </div>
+</div>
+
+<script>window.DATOS = /*__DATOS__*/null;</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+const D = window.DATOS;
+const $ = id => document.getElementById(id);
+if (!D) { $('aviso').style.display = 'flex'; throw new Error('Sin datos de simulación'); }
+
+// ---------------------------------------------------------------- datos
+const L = D.layout, A = D.autos, N = A.lleg.length, C = D.capacidad;
+const H = D.horizonte_s;
+const PARE = L.pare, XT = L.talanquera_x, XCALLE = L.calle_x, XLLEGA = L.carril_llegada_x;
+const AMPLIA = C > L.n_reales;                     // se dibuja la zona de ampliación
+const CX = -38, CZ = -17;                          // centro aproximado del parqueadero
+
+const cuantos = (arr, t) => { let a = 0, b = arr.length; while (a < b) { const m = (a + b) >> 1; if (arr[m] <= t) a = m + 1; else b = m; } return a; };
+const entran = [], salen = [], desvT = D.destinos.map(() => []);
+for (let i = 0; i < N; i++) {
+  if (A.cupo[i] >= 0) { entran.push(A.fin[i]); if (A.sal[i] != null) salen.push(A.sal[i]); }
+  else desvT[A.dest[i]].push(A.fin[i]);
+}
+entran.sort((a, b) => a - b); salen.sort((a, b) => a - b);
+const ocupEn = t => cuantos(entran, t) - cuantos(salen, t);
+
+function azar(semilla) { let s = semilla >>> 0; return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const rnd = azar(20261112);
+function dentro(poli, x, z) {                      // punto dentro de un polígono
+  let d = false;
+  for (let i = 0, j = poli.length - 1; i < poli.length; j = i++) {
+    const [xi, zi] = poli[i], [xj, zj] = poli[j];
+    if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) d = !d;
+  }
+  return d;
+}
+
+// ---------------------------------------------------------------- escena base
+const cont = $('lienzo');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+cont.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9fd0f0);
+scene.fog = new THREE.Fog(0x9fd0f0, 320, 950);
+const camera = new THREE.PerspectiveCamera(42, 1, 1, 1800);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.maxPolarAngle = Math.PI * 0.485; controls.minDistance = 10; controls.maxDistance = 480;
+
+const VISTAS = {
+  general: { p: [58, 64, 70], o: [-36, 0, -14] },
+  entrada: { p: [23, 10, -19], o: [-5, 1.0, -0.5] },
+  cenital: { p: [-38, 232, -16.5], o: [-38, 0, -17] },
+};
+let transicion = null;
+function irA(nombre, inmediato) {
+  const v = VISTAS[nombre];
+  document.querySelectorAll('.camaras button').forEach(b => b.classList.toggle('activa', b.dataset.cam === nombre));
+  if (inmediato) { camera.position.set(...v.p); controls.target.set(...v.o); controls.update(); return; }
+  transicion = { p0: camera.position.clone(), o0: controls.target.clone(), p1: new THREE.Vector3(...v.p), o1: new THREE.Vector3(...v.o), u: 0 };
+}
+irA('general', true);
+document.querySelectorAll('.camaras button').forEach(b => b.addEventListener('click', () => irA(b.dataset.cam)));
+
+const hemi = new THREE.HemisphereLight(0xdcefff, 0x6f8f55, 2.0); scene.add(hemi);
+const sol = new THREE.DirectionalLight(0xffffff, 3.0);
+sol.castShadow = true; sol.shadow.mapSize.set(2048, 2048);
+const sc = sol.shadow.camera; sc.left = -135; sc.right = 135; sc.top = 135; sc.bottom = -135; sc.near = 10; sc.far = 800;
+sol.shadow.bias = -0.0004; sol.shadow.normalBias = 0.4;
+sol.target.position.set(CX, 0, CZ); scene.add(sol, sol.target);
+
+const mat = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
+function caja(w, h, d, color, x, y, z, sombra = true) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), typeof color === 'number' ? mat(color) : color);
+  m.position.set(x, y, z); m.castShadow = sombra; m.receiveShadow = true; scene.add(m); return m;
+}
+function plano(w, d, material, x, y, z) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), material);
+  m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); m.receiveShadow = true; scene.add(m); return m;
+}
+function lienzo(w, h, pintar) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; pintar(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
+// muro entre dos puntos (para setos, cercas y bordillos rectos)
+function tramo(x0, z0, x1, z1, alto, ancho, material, y0 = 0, sombra = true) {
+  const largo = Math.hypot(x1 - x0, z1 - z0);
+  const m = new THREE.Mesh(new THREE.BoxGeometry(largo, alto, ancho), material);
+  m.position.set((x0 + x1) / 2, y0 + alto / 2, (z0 + z1) / 2); m.rotation.y = Math.atan2(-(z1 - z0), x1 - x0);
+  m.castShadow = sombra; m.receiveShadow = true; scene.add(m); return m;
+}
+
+// ---------------------------------------------------------------- terreno y entorno
+plano(2400, 2400, mat(0x7fae5a), 0, -0.06, 0);
+
+// Calle 17a (norte-sur) y Avenida Cañasgordas
+const texCalle = lienzo(128, 256, (g, w, h) => {
+  g.fillStyle = '#4a4d52'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 500; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * .05})`; g.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+  g.fillStyle = '#e8d44d'; g.fillRect(w / 2 - 2, 40, 4, 150);
+});
+texCalle.wrapT = THREE.RepeatWrapping; texCalle.repeat.set(1, 900 / 14);
+plano(7, 900, mat(0xffffff, { map: texCalle }), XCALLE, 0.0, 0);
+plano(1.3, 900, mat(0xb9b6ae), XCALLE - 4.15, 0.005, 0);
+plano(18, 900, mat(0x4a4d52), 127, 0.0, 0); plano(1.6, 900, mat(0x6f9a52), 127, 0.02, 0);
+
+// canchas, piscina y campo de fútbol (referencias de la vista satelital)
+const texCancha = (fondo, zona, linea) => lienzo(256, 448, (g, w, h) => {
+  g.fillStyle = fondo; g.fillRect(0, 0, w, h); g.fillStyle = zona;
+  g.fillRect(70, 0, 116, 96); g.fillRect(70, h - 96, 116, 96); g.beginPath(); g.arc(w / 2, h / 2, 34, 0, 6.3); g.fill();
+  g.strokeStyle = linea; g.lineWidth = 4; g.strokeRect(10, 10, w - 20, h - 20); g.beginPath(); g.moveTo(10, h / 2); g.lineTo(w - 10, h / 2); g.stroke();
+});
+plano(23.2, 41.5, mat(0xffffff, { map: texCancha('#3f8f6a', '#e3c24a', '#f1f5f9') }), 32.9, 0.02, -14.3);
+plano(20.3, 34.3, mat(0xffffff, { map: texCancha('#b65a4a', '#4a6fb0', '#f1f5f9') }), 65.8, 0.02, -21.8);
+plano(21.5, 31.4, mat(0xd9d4c7), 66.3, 0.02, 32.3); plano(16.5, 26.4, mat(0x4fc3e8), 66.3, 0.04, 32.3);
+const cupula = new THREE.Mesh(new THREE.SphereGeometry(10.5, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xf1f1ee));
+cupula.scale.y = 0.32; cupula.position.set(66.3, 0, 4.5); cupula.castShadow = true; scene.add(cupula);
+const texPaneles = lienzo(256, 256, (g, w, h) => { g.fillStyle = '#d8d8d4'; g.fillRect(0, 0, w, h); g.fillStyle = '#2b3d5c';
+  for (let f = 0; f < 6; f++) for (let c = 0; c < 4; c++) g.fillRect(8 + c * 62, 8 + f * 42, 54, 34); });
+caja(31, 9, 45.5, 0xe6e2d8, 96.5, 4.5, -18.3); plano(30, 44.5, mat(0xffffff, { map: texPaneles }), 96.5, 9.03, -18.3);
+caja(27, 6, 20, 0xf0eee8, 41, 3, 36); caja(16, 5, 24, 0xf0eee8, 30, 2.5, 46);
+caja(20, 4, 26, 0x8a5b45, -84, 2, 45); caja(21, 0.5, 27, 0x6e4433, -84, 4.2, 45);
+const texFutbol = lienzo(256, 400, (g, w, h) => { g.fillStyle = '#74b055'; g.fillRect(0, 0, w, h);
+  for (let k = 0; k < 8; k += 2) { g.fillStyle = 'rgba(255,255,255,.06)'; g.fillRect(0, k * 50, w, 50); }
+  g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 3; g.strokeRect(12, 12, w - 24, h - 24);
+  g.beginPath(); g.moveTo(12, h / 2); g.lineTo(w - 12, h / 2); g.stroke(); g.beginPath(); g.arc(w / 2, h / 2, 34, 0, 6.3); g.stroke(); });
+plano(56, 88, mat(0xffffff, { map: texFutbol }), -122, 0.01, -43);
+
+// ---------------------------------------------------------------- piso de grava (textura dibujada sobre el contorno real)
+const WX0 = -112, WX1 = 22, WZ0 = -100, WZ1 = 66, PX = 12;
+const texLote = lienzo((WX1 - WX0) * PX, (WZ1 - WZ0) * PX, (g, w, h) => {
+  const u = x => (x - WX0) * PX, v = z => (z - WZ0) * PX;
+  const trazo = pts => { g.beginPath(); pts.forEach(([x, z], k) => k ? g.lineTo(u(x), v(z)) : g.moveTo(u(x), v(z))); };
+  const zonas = [L.contorno]; if (AMPLIA) zonas.push(L.ampliacion, [[-58, -83.5], [-48, -83.5], [-48, -77], [-58, -77]]);
+  g.save(); g.beginPath();
+  for (const poli of zonas) { poli.forEach(([x, z], k) => k ? g.lineTo(u(x), v(z)) : g.moveTo(u(x), v(z))); g.closePath(); }
+  g.clip();
+  g.fillStyle = '#8e8a82'; g.fillRect(0, 0, w, h);
+  const tonos = ['255,255,255', '0,0,0', '128,100,66', '60,60,62'];
+  for (let i = 0; i < 70000; i++) { g.fillStyle = `rgba(${tonos[i % 4]},${0.03 + Math.random() * 0.09})`; const s = 1 + Math.random() * 3; g.fillRect(Math.random() * w, Math.random() * h, s, s); }
+  // huellas de tierra en los carriles
+  g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath();
+  const tira = pts => pts.forEach(([x, z], k) => k ? g.lineTo(u(x), v(z)) : g.moveTo(u(x), v(z)));
+  for (const [nombre, t] of Object.entries(L.troncos)) { if (nombre === 'EX' && !AMPLIA) continue; tira([PARE, ...t.entra, t.ini, t.fin]); tira([t.tipo === 'sigue' ? t.fin : t.ini, ...t.sale.slice(0, -3)]); }
+  g.strokeStyle = 'rgba(118,98,74,.20)'; g.lineWidth = 3.4 * PX; g.stroke();
+  g.strokeStyle = 'rgba(118,98,74,.14)'; g.lineWidth = 1.8 * PX; g.stroke();
+  // franjas verdes de las islas
+  g.fillStyle = '#6f9a52';
+  for (const i of L.islas) g.fillRect(u(i.x0), v(i.z - 0.42), (i.x1 - i.x0) * PX, 0.84 * PX);
+  const z = L.isla_lazo; g.fillRect(u(z.x0), v(z.z0), (z.x1 - z.x0) * PX, (z.z1 - z.z0) * PX);
+  // cupos: marca muy tenue en los disponibles y rayado en los que no existen con la capacidad elegida
+  for (const c of L.cupos) {
+    if (c.zona !== 'real' && !AMPLIA) continue;
+    g.save(); g.translate(u(c.x), v(c.z)); g.rotate(Math.atan2(c.hz, c.hx));
+    if (c.id < C) { g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = 1.5; g.strokeRect(-2.3 * PX, -1.05 * PX, 4.6 * PX, 2.1 * PX); }
+    else { g.fillStyle = 'rgba(70,58,44,.55)'; g.fillRect(-2.3 * PX, -1.05 * PX, 4.6 * PX, 2.1 * PX);
+      g.beginPath(); g.rect(-2.3 * PX, -1.05 * PX, 4.6 * PX, 2.1 * PX); g.clip(); g.strokeStyle = 'rgba(251,191,36,.6)'; g.lineWidth = 2.5;
+      for (let k = -8; k < 8; k++) { g.beginPath(); g.moveTo(k * 9, -14); g.lineTo(k * 9 + 26, 14); g.stroke(); } }
+    g.restore();
+  }
+  // borde irregular: el pasto invade la grava
+  g.strokeStyle = 'rgba(92,120,66,.5)'; g.lineWidth = 1.6 * PX;
+  for (const poli of zonas) { trazo(poli); g.closePath(); g.stroke(); }
+  g.restore();
+  // adoquines entre la calle y la portería
+  g.fillStyle = '#aeaaa1'; g.beginPath(); g.moveTo(u(0), v(-5.2)); g.lineTo(u(XCALLE - 3.5), v(-8.5)); g.lineTo(u(XCALLE - 3.5), v(8.5)); g.lineTo(u(0), v(5.2)); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(0,0,0,.10)'; g.lineWidth = 1;
+  for (let x = 0; x < 5; x += 0.5) { g.beginPath(); g.moveTo(u(x), v(-8.5)); g.lineTo(u(x), v(8.5)); g.stroke(); }
+  g.fillStyle = '#9d9a92'; g.fillRect(u(-10), v(-4.9), 10 * PX, 9.8 * PX);
+});
+plano(WX1 - WX0, WZ1 - WZ0, mat(0xffffff, { map: texLote, transparent: true }), (WX0 + WX1) / 2, 0.03, (WZ0 + WZ1) / 2);
+
+// ---------------------------------------------------------------- bordillos amarillos
+const matBordillo = mat(0xd9bd3a);
+const dientes = [];
+for (const i of L.islas) {                          // bordillo en sierra de las islas
+  const n = Math.max(2, Math.round((i.x1 - i.x0) / 1.2225)), paso = (i.x1 - i.x0) / n;
+  for (let k = 0; k < n; k++) dientes.push([i.x0 + k * paso, i.z + (k % 2 ? 0.55 : -0.55), i.x0 + (k + 1) * paso, i.z + (k % 2 ? -0.55 : 0.55)]);
+}
+const sierra = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.2, 0.2), matBordillo, dientes.length);
+const tmp = new THREE.Object3D(), col = new THREE.Color();
+dientes.forEach(([x0, z0, x1, z1], k) => {
+  tmp.position.set((x0 + x1) / 2, 0.13, (z0 + z1) / 2); tmp.rotation.set(0, Math.atan2(-(z1 - z0), x1 - x0), 0);
+  tmp.scale.set(Math.hypot(x1 - x0, z1 - z0) + 0.1, 1, 1); tmp.updateMatrix(); sierra.setMatrixAt(k, tmp.matrix);
+});
+sierra.castShadow = true; scene.add(sierra);
+const zl = L.isla_lazo;
+[[zl.x0, zl.z0, zl.x1, zl.z0], [zl.x1, zl.z0, zl.x1, zl.z1], [zl.x1, zl.z1, zl.x0, zl.z1], [zl.x0, zl.z1, zl.x0, zl.z0],
+ [-9.2, -78.2, -9.2, -10.4], [-51.6, -89.9, -32, -89.9], [-48, 13.5, -28.2, 13.5], [-20.6, 36, -20.6, 54.4]]
+  .forEach(([a, b, c, d]) => tramo(a, b, c, d, 0.2, 0.22, matBordillo, 0.03));
+if (!AMPLIA) tramo(-57.2, -68, -57.2, -18, 0.2, 0.22, matBordillo, 0.03);
+
+// ---------------------------------------------------------------- setos y cerca
+const matSeto = mat(0x3f7a3a);
+tramo(-8.4, -78.6, -8.4, -34, 1.6, 1.1, matSeto); tramo(-8.4, -34, -6.9, -30, 1.6, 1.1, matSeto); tramo(-6.9, -30, -6.9, -15.5, 1.6, 1.1, matSeto);
+tramo(-52.6, -90.9, -31.6, -90.9, 1.5, 1.0, matSeto); tramo(-31.6, -90.9, -31.6, -79.3, 1.5, 1.0, matSeto); tramo(-31.6, -79.3, -8.4, -79.3, 1.5, 1.0, matSeto);
+if (!AMPLIA) tramo(-58.3, -86, -58.3, -14, 1.4, 1.0, matSeto);
+const matCerca = new THREE.MeshBasicMaterial({ color: 0x9aa3ab, transparent: true, opacity: 0.32, side: THREE.DoubleSide });
+const matPoste = mat(0x6b7280);
+function cerca(x0, z0, x1, z1) {
+  tramo(x0, z0, x1, z1, 2.2, 0.03, matCerca, 0, false);
+  const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 3);
+  for (let k = 0; k <= n; k++) caja(0.08, 2.3, 0.08, matPoste, x0 + (x1 - x0) * k / n, 1.15, z0 + (z1 - z0) * k / n, false);
+}
+cerca(1.6, 5.3, 1.6, 30); cerca(1.6, -12, 1.6, -34); cerca(0, -5.2, -3.2, -5.2); cerca(0, 5.2, -3.2, 5.2); cerca(0, 5.2, 1.6, 5.3);
+
+// ---------------------------------------------------------------- Laboratorio Central de Mezclas (ladrillo)
+const texLadrillo = lienzo(256, 128, (g, w, h) => {
+  g.fillStyle = '#8a5038'; g.fillRect(0, 0, w, h);
+  for (let f = 0; f < 8; f++) for (let c = -1; c < 8; c++) {
+    const t = 150 + Math.random() * 30; g.fillStyle = `rgb(${t},${t * 0.56 | 0},${t * 0.4 | 0})`;
+    g.fillRect(c * 32 + (f % 2 ? 16 : 0) + 1, f * 16 + 1, 30, 14);
+  }
+});
+function ladrillo(w, h, d, x, z) {
+  const t = texLadrillo.clone(); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(Math.max(w, d) / 3.2, h / 1.6); t.needsUpdate = true;
+  return caja(w, h, d, mat(0xffffff, { map: t }), x, h / 2, z);
+}
+const LX0 = -47.4, LX1 = -27.1, LZ0 = -9.1, LZ1 = 13.6, LH = 7.4;
+ladrillo(LX1 - LX0, LH, LZ1 - LZ0, (LX0 + LX1) / 2, (LZ0 + LZ1) / 2);
+caja(LX1 - LX0 - 0.6, 0.25, LZ1 - LZ0 - 0.6, 0xd9dadb, (LX0 + LX1) / 2, LH + 0.12, (LZ0 + LZ1) / 2, false);
+const matVidrio = mat(0x1b2733), matConcreto = mat(0x8b8d8c);
+for (let k = 0; k < 4; k++) caja(1.7, 1.1, 0.12, matVidrio, LX0 + 3 + k * 3.6, 5.0, LZ0 - 0.05, false);
+caja(5.2, 2.6, 0.14, matConcreto, LX1 - 4.2, 1.9, LZ0 - 0.05, false);
+for (let k = 0; k < 5; k++) caja(0.12, 1.1, 1.7, matVidrio, LX1 + 0.05, 5.0, LZ0 + 3 + k * 4, false);
+const matBaranda = mat(0x3f444a);
+[[LX0, LZ0, LX1, LZ0], [LX1, LZ0, LX1, LZ1], [LX0, LZ0, LX0, LZ1], [LX0, LZ1, LX1, LZ1]].forEach(([a, b, c, d]) => { tramo(a, b, c, d, 0.06, 0.06, matBaranda, LH + 1.0, false); tramo(a, b, c, d, 0.06, 0.06, matBaranda, LH + 0.55, false); });
+// bloque oriental (ladrillo y concreto) al sur de la vía de entrada
+ladrillo(11.4, 4.4, 8.5, -20.6, 9.35); caja(6, 4.0, 8.5, matConcreto, -11.9, 2.0, 9.35);
+caja(11.0, 0.2, 8.1, 0xd9dadb, -20.6, 4.5, 9.35, false); caja(5.6, 0.2, 8.1, 0xc9cacb, -11.9, 4.1, 9.35, false);
+for (let k = 0; k < 5; k++) caja(0.5, 0.5, 0.12, matVidrio, -25 + k * 2.1, 3.1, 5.05, false);
+caja(1.1, 2.3, 0.12, matVidrio, -13.2, 1.15, 5.05, false); caja(1.1, 2.3, 0.12, matVidrio, -11, 1.15, 5.05, false);
+
+// ---------------------------------------------------------------- portería: talanqueras, caseta, cubierta y avisos
+caja(5.6, 0.22, 0.5, matBordillo, -7.3, 0.11, 0);                       // separador entre carriles
+caja(0.34, 1.05, 0.34, 0xf2c230, XT, 0.52, -0.3); caja(0.34, 1.05, 0.34, 0xf2c230, XT, 0.52, 0.3);
+caja(0.3, 1.25, 0.3, 0x475569, XT + 1.2, 0.62, -0.25);                   // lector de tarjeta
+const texBarra = lienzo(256, 16, (g, w, h) => { for (let k = 0; k < 8; k++) { g.fillStyle = k % 2 ? '#f8fafc' : '#dc2626'; g.fillRect(k * 32, 0, 32, h); } });
+const matBarra = mat(0xffffff, { map: texBarra });
+function barra(z0, sentido) {
+  const grupo = new THREE.Group(); grupo.position.set(XT, 1.02, z0);
+  const palo = new THREE.Mesh(new THREE.BoxGeometry(4.3, 0.13, 0.13), matBarra); palo.rotation.y = Math.PI / 2; palo.position.z = sentido * 2.15; palo.castShadow = true;
+  grupo.add(palo); scene.add(grupo); return grupo;
+}
+const brazo = barra(-0.3, -1), brazoSal = barra(0.3, 1); brazoSal.rotation.x = -1.2;
+// cubierta peatonal y caseta al norte del acceso
+caja(7, 0.16, 5, 0x30353b, 0.2, 3.05, -8.2);
+[[-3, -10.4], [3.4, -10.4], [-3, -6], [3.4, -6]].forEach(([x, z]) => caja(0.12, 3, 0.12, matPoste, x, 1.5, z, false));
+caja(2.2, 2.3, 2.0, 0xe8e6e0, -1.2, 1.15, -8.6); caja(2.24, 0.7, 2.04, matVidrio, -1.2, 1.55, -8.6, false);
+caja(0.9, 1.0, 0.9, 0x8f969c, 1.8, 0.5, -7.4);
+[[-8.6, -7.6], [-10.4, -8.9]].forEach(([x, z]) => caja(0.9, 2.3, 0.22, 0x1d5fb4, x, 1.15, z));
+// aviso del parqueadero y tablero de cupos libres
+const texAviso = lienzo(768, 192, (g, w, h) => {
+  g.fillStyle = '#1e3a8a'; g.fillRect(0, 0, w, h); g.fillStyle = '#f2c230'; g.fillRect(0, h - 12, w, 12);
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = '700 30px system-ui, Segoe UI, sans-serif'; g.fillText('PARQUEADERO', w / 2, 52);
+  g.font = '700 74px system-ui, Segoe UI, sans-serif'; g.fillText('ALMENDROS', w / 2, 116);
+});
+const lienzoLed = document.createElement('canvas'); lienzoLed.width = 320; lienzoLed.height = 150;
+const texLed = new THREE.CanvasTexture(lienzoLed); texLed.colorSpace = THREE.SRGBColorSpace;
+function pintarLed(libres) {
+  const g = lienzoLed.getContext('2d'); g.fillStyle = '#0b0f14'; g.fillRect(0, 0, 320, 150);
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillStyle = '#94a3b8'; g.font = '600 24px system-ui, sans-serif'; g.fillText('CUPOS LIBRES', 160, 26);
+  if (libres > 0) { g.fillStyle = '#4ade80'; g.font = '700 92px system-ui, sans-serif'; g.fillText(String(libres), 160, 94); }
+  else { g.fillStyle = '#f87171'; g.font = '700 70px system-ui, sans-serif'; g.fillText('LLENO', 160, 94); }
+  texLed.needsUpdate = true;
+}
+const aviso = new THREE.Group(); aviso.position.set(2.9, 0, 8.6); aviso.rotation.y = Math.PI * 0.86;
+const parte = (geo, material, x, y, z) => { const m = new THREE.Mesh(geo, material); m.position.set(x, y, z); m.castShadow = true; aviso.add(m); return m; };
+parte(new THREE.BoxGeometry(0.16, 4.6, 0.16), matPoste, -1.7, 2.3, 0); parte(new THREE.BoxGeometry(0.16, 4.6, 0.16), matPoste, 1.7, 2.3, 0);
+parte(new THREE.BoxGeometry(3.8, 1.0, 0.14), mat(0x1e3a8a), 0, 4.1, 0); parte(new THREE.PlaneGeometry(3.7, 0.92), new THREE.MeshBasicMaterial({ map: texAviso }), 0, 4.1, 0.08);
+parte(new THREE.BoxGeometry(2.6, 1.3, 0.14), mat(0x1f2937), 0, 2.75, 0); parte(new THREE.PlaneGeometry(2.45, 1.15), new THREE.MeshBasicMaterial({ map: texLed }), 0, 2.75, 0.08);
+scene.add(aviso);
+// delineadores y conos
+const matDelin = mat(0xe4572e);
+[[2.6, -10.8], [3.2, -12.6], [3.6, -14.4]].forEach(([x, z]) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.16, 1.1, 8), matDelin); m.position.set(x, 0.55, z); scene.add(m); });
+[[-12.5, -9.6], [-15.2, -12.2], [-22, -11.2]].forEach(([x, z]) => { const m = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.7, 10), mat(0x1d5fb4)); m.position.set(x, 0.35, z); m.castShadow = true; scene.add(m); });
+// alumbrado
+const matFoco = new THREE.MeshLambertMaterial({ color: 0xfff3c4, emissive: 0xffd76a, emissiveIntensity: 0 });
+for (const [x, z] of [[-9.6, -66], [-9.6, -40], [-56.4, -52], [-56.4, -28], [-30, 33], [-64, 45], [3, -18], [3, 18]]) {
+  if (AMPLIA && x < -55 && z < 0) continue;
+  const p = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 8, 6), mat(0x6f6253)); p.position.set(x, 4, z); p.castShadow = true; scene.add(p);
+  const f = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.18, 0.45), matFoco); f.position.set(x + (x < CX ? 0.5 : -0.5), 7.9, z); scene.add(f);
+}
+const luzEntrada = new THREE.PointLight(0xffd9a0, 0, 60, 1.6); luzEntrada.position.set(-3, 5.5, -3); scene.add(luzEntrada);
+
+// ---------------------------------------------------------------- geometrías con color por vértice
+function tinte(geo, hex) {
+  const g = geo.index ? geo.toNonIndexed() : geo, c = new THREE.Color(hex), n = g.attributes.position.count, a = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { a[3 * i] = c.r; a[3 * i + 1] = c.g; a[3 * i + 2] = c.b; }
+  g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g;
+}
+const pieza = (geo, hex, x, y, z, rx = 0) => { if (rx) geo.rotateX(rx); geo.translate(x, y, z); return tinte(geo, hex); };
+const copa = (rx, ry, rz, hex, x, y, z) => { const g = new THREE.IcosahedronGeometry(1, 1); g.scale(rx, ry, rz); g.translate(x, y, z); return tinte(g, hex); };
+
+// árboles pequeños de las islas, samanes de copa ancha y palmas
+const geoAlmendro = mergeGeometries([
+  pieza(new THREE.CylinderGeometry(0.12, 0.2, 2.9, 6), 0x5d4630, 0, 1.45, 0),
+  pieza(new THREE.CylinderGeometry(2.2, 2.7, 0.5, 9), 0x4f9a45, 0, 3.0, 0),
+  pieza(new THREE.CylinderGeometry(1.3, 1.9, 0.5, 9), 0x62b052, 0, 3.75, 0),
+]);
+const geoSaman = mergeGeometries([
+  pieza(new THREE.CylinderGeometry(0.42, 0.62, 6.4, 7), 0x4d3b2a, 0, 3.2, 0),
+  copa(7.2, 2.7, 7.0, 0x3f8a3b, 0, 8.6, 0), copa(4.6, 2.1, 4.4, 0x4a9a44, 3.6, 7.6, 1.6),
+  copa(4.3, 2.0, 4.6, 0x357a33, -3.2, 7.9, -2.2), copa(3.6, 1.6, 3.6, 0x57a84c, 0.6, 10.2, -0.6),
+]);
+const hojas = [];
+for (let k = 0; k < 8; k++) { const g = new THREE.ConeGeometry(0.42, 3.8, 4); g.translate(0, 1.9, 0); g.rotateZ(-1.15 - (k % 2) * 0.28); g.rotateY(k * Math.PI / 4); g.translate(0, 9.6, 0); hojas.push(tinte(g, k % 2 ? 0x5fae4a : 0x4e9a40)); }
+const geoPalma = mergeGeometries([pieza(new THREE.CylinderGeometry(0.17, 0.26, 9.8, 7), 0x8a7a63, 0, 4.9, 0), ...hojas]);
+
+const LIBRE = (x, z, margen) => {                   // fuera del parqueadero, de las calles y de las edificaciones
+  if (Math.abs(x - XCALLE) < 5.5 || Math.abs(x - 127) < 11) return false;
+  if (x > 18 && x < 114 && z > -44 && z < 58) return false;
+  if (x < -70 && x > -152 && z > -90 && z < 62) return false;
+  if (x > -14 && x < 6 && z > -14 && z < 16) return false;
+  for (const [dx, dz] of [[0, 0], [margen, 0], [-margen, 0], [0, margen], [0, -margen]]) {
+    if (dentro(L.contorno, x + dx, z + dz)) return false;
+    if (AMPLIA && x + dx > -78 && x + dx < -47 && z + dz > -86 && z + dz < -18) return false;
+  }
+  return !(x > LX0 - 2 && x < LX1 + 20 && z > LZ0 - 2 && z < LZ1 + 2);
+};
+const almendros = [], samanes = [], palmas = [[2.9, -27, 1], [3.1, 17.5, 0.92], [-3.4, 12.2, 1.08], [14, -40, 1], [14.5, 12, 0.95], [-70, 60, 1]];
+for (const i of L.islas) for (let k = 0; k < 3; k++) almendros.push([i.x0 + (i.x1 - i.x0) * (0.17 + 0.33 * k) + (rnd() - .5) * 1.5, i.z, 0.85 + rnd() * 0.3]);
+[[-54.5, 44.5], [-46, 44.3], [-37.6, 44.6]].forEach(([x, z]) => samanes.push([x, z, 0.78]));
+for (const z of [-73, -58, -44, -30]) samanes.push([-2.2 + rnd() * 1.5, z + rnd() * 3, 0.85 + rnd() * 0.15]);
+[[-61, 29.2], [-53, 29.4], [-74, 33], [-72.5, 14], [-64, 6], [-63, -8], [-12, 25], [-13, 40], [-11, 54], [-40, 64], [-58, 65], [-76, 56], [-20, -88], [-12, -90]]
+  .forEach(([x, z]) => samanes.push([x, z, 0.8 + rnd() * 0.3]));
+for (let z = -84; z < -14; z += 13) { const x = AMPLIA ? -84 : -65; samanes.push([x + rnd() * 3, z + rnd() * 4, 0.85 + rnd() * 0.3]); }
+for (let k = 0; k < 260; k++) {                     // arboleda alrededor
+  const x = -360 + rnd() * 720, z = -330 + rnd() * 700, cerca2 = x > -110 && x < 20 && z > -150 && z < 100;
+  if (LIBRE(x, z, 7)) (rnd() < (cerca2 ? 0.85 : 0.55) ? samanes : almendros).push([x, z, 0.75 + rnd() * 0.55]);
+}
+for (let k = 0; k < 46; k++) { const x = -72 + rnd() * 74, z = -150 + rnd() * 56; if (LIBRE(x, z, 7)) samanes.push([x, z, 0.85 + rnd() * 0.4]); }
+function sembrar(geo, lista, plano2) {
+  const m = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), lista.length);
+  m.castShadow = true; m.receiveShadow = true;
+  lista.forEach(([x, z, e], k) => { tmp.position.set(x, 0, z); tmp.rotation.set(0, rnd() * 6.28, 0); tmp.scale.set(e, e * (plano2 ? 1 : 0.9 + rnd() * 0.25), e); tmp.updateMatrix();
+    m.setMatrixAt(k, tmp.matrix); m.setColorAt(k, col.setHSL(0.29 + rnd() * 0.05, 0.45, 0.5 + rnd() * 0.14)); });
+  scene.add(m);
+}
+sembrar(geoAlmendro, almendros); sembrar(geoSaman, samanes); sembrar(geoPalma, palmas, true);
+
+// ---------------------------------------------------------------- vehículos (instanciados)
+const rueda = (x, z) => pieza(new THREE.CylinderGeometry(0.34, 0.34, 0.26, 10), 0x15171a, x, 0.34, z, Math.PI / 2);
+const geoCarroceria = mergeGeometries([
+  pieza(new THREE.BoxGeometry(4.3, 0.62, 1.8), 0xffffff, 0, 0.66, 0),
+  pieza(new THREE.BoxGeometry(2.25, 0.09, 1.62), 0xffffff, -0.3, 1.55, 0),
+  pieza(new THREE.BoxGeometry(0.12, 0.5, 1.5), 0xffffff, -1.38, 1.24, 0),
+]);
+const geoDetalles = mergeGeometries([
+  pieza(new THREE.BoxGeometry(2.3, 0.56, 1.56), 0x1b2733, -0.3, 1.24, 0),
+  rueda(1.38, 0.86), rueda(1.38, -0.86), rueda(-1.38, 0.86), rueda(-1.38, -0.86),
+  pieza(new THREE.BoxGeometry(0.06, 0.16, 0.42), 0xfff3b0, 2.16, 0.74, 0.58), pieza(new THREE.BoxGeometry(0.06, 0.16, 0.42), 0xfff3b0, 2.16, 0.74, -0.58),
+  pieza(new THREE.BoxGeometry(0.06, 0.16, 0.42), 0xd92323, -2.16, 0.74, 0.58), pieza(new THREE.BoxGeometry(0.06, 0.16, 0.42), 0xd92323, -2.16, 0.74, -0.58),
+]);
+const carroceria = new THREE.InstancedMesh(geoCarroceria, new THREE.MeshLambertMaterial({ vertexColors: true }), Math.max(N, 1));
+const detalles = new THREE.InstancedMesh(geoDetalles, new THREE.MeshLambertMaterial({ vertexColors: true }), Math.max(N, 1));
+carroceria.castShadow = detalles.castShadow = true; carroceria.receiveShadow = true;
+carroceria.frustumCulled = detalles.frustumCulled = false;
+const PALETA = [[0xf2f2f2, 28], [0xb8bcc2, 20], [0x6b7078, 16], [0x1f2024, 12], [0xb3261e, 8], [0x1f4e9a, 7], [0xc9b89a, 4], [0xe0a020, 3], [0x2e5d3a, 2]];
+const escala = [];
+for (let i = 0; i < N; i++) {
+  let r = rnd() * 100, hex = PALETA[0][0]; for (const [h, p] of PALETA) { if (r < p) { hex = h; break; } r -= p; }
+  carroceria.setColorAt(i, col.setHex(hex));
+  const tipo = rnd(); escala.push(tipo < 0.3 ? [1.02, 1.22, 1.03] : tipo < 0.5 ? [0.88, 1.0, 0.94] : [1, 1, 1]);
+}
+scene.add(carroceria, detalles);
+
+// etiquetas de destino para los desviados
+const texDest = D.destinos.map(n => lienzo(256, 64, (g, w, h) => {
+  g.fillStyle = 'rgba(220,38,38,.92)'; g.beginPath(); g.roundRect(2, 2, w - 4, h - 4, 14); g.fill();
+  g.fillStyle = '#fff'; g.font = '700 30px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('→ ' + n, w / 2, h / 2 + 1);
+}));
+const etiquetas = Array.from({ length: 8 }, () => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: texDest[0], depthTest: false })); s.scale.set(7, 1.75, 1); s.visible = false; scene.add(s); return s; });
+
+// ---------------------------------------------------------------- rutas
+function ruta(puntos, r = 3) {
+  const dd = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  const pts = puntos.filter((p, k) => k === 0 || dd(p, puntos[k - 1]) > 0.05);
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1], d1 = dd(p0, p1), d2 = dd(p1, p2), rr = Math.min(r, d1 / 2, d2 / 2);
+    const a = [p1[0] + (p0[0] - p1[0]) * rr / d1, p1[1] + (p0[1] - p1[1]) * rr / d1], b = [p1[0] + (p2[0] - p1[0]) * rr / d2, p1[1] + (p2[1] - p1[1]) * rr / d2];
+    for (let k = 0; k <= 6; k++) { const u = k / 6, w0 = (1 - u) * (1 - u), w1 = 2 * u * (1 - u), w2 = u * u; out.push([w0 * a[0] + w1 * p1[0] + w2 * b[0], w0 * a[1] + w1 * p1[1] + w2 * b[1]]); }
+  }
+  out.push(pts[pts.length - 1]);
+  const acum = [0]; for (let i = 1; i < out.length; i++) acum.push(acum[i - 1] + dd(out[i - 1], out[i]));
+  return { pts: out, acum, largo: acum[acum.length - 1] };
+}
+const P = { x: 0, z: 0, dx: 1, dz: 0 };
+function enRuta(R, d) {
+  d = Math.max(0, Math.min(R.largo, d)); let i = 1; while (i < R.acum.length - 1 && R.acum[i] < d) i++;
+  const a = R.pts[i - 1], b = R.pts[i], seg = R.acum[i] - R.acum[i - 1] || 1, u = (d - R.acum[i - 1]) / seg;
+  P.x = a[0] + (b[0] - a[0]) * u; P.z = a[1] + (b[1] - a[1]) * u; P.dx = (b[0] - a[0]) / seg; P.dz = (b[1] - a[1]) / seg; return P;
+}
+const PASO_FILA = 6.0, T_APROX = 14, V_APROX = 8.5, T_REVERSA = 5, V_SALIDA = 4.6, V_DESVIO = 6;
+const rutaFila = ruta([PARE, [XLLEGA, PARE[1]], [XLLEGA, -430]], 3.6);          // la fila crece hacia el norte por la Calle 17a
+const rutaDesvio = ruta([PARE, [-3.2, -1.3], [-3.4, 1.2], [-1.6, 2.2], ...L.cola_salida.slice(2)], 1.6);
+const cache = new Map();
+function rutasDe(i) {
+  let r = cache.get(i); if (r) return r;
+  const c = L.cupos[A.cupo[i]], T = L.troncos[c.tronco], acc = [c.ax, c.az], b = [c.x, c.z], s = T.tipo === 'sigue' ? -3 : 3;
+  const giro = [acc[0] + T.dir[0] * s, acc[1] + T.dir[1] * s];                 // donde termina la reversa
+  r = { ida: ruta([PARE, ...T.entra, T.ini, acc, b], 3), rev: ruta([b, acc, giro], 2.6),
+        sal: ruta([giro, T.tipo === 'sigue' ? T.fin : T.ini, ...T.sale], 3.4), c };
+  cache.set(i, r); return r;
+}
+const dq = new Float32Array(Math.max(N, 1)).fill(-1);
+const hechos = t => cuantos(A.fin, t);
+const suave = u => u * u * (3 - 2 * u);
+const O = { x: 0, z: 0, ang: 0, desvio: false };
+// Devuelve la pose del vehículo i en el instante t (s), o null si no está en escena.
+function pose(i, t, dts, salto) {
+  const ll = A.lleg[i], fi = A.fin[i]; O.desvio = false;
+  if (t < ll - T_APROX) return null;
+  if (t < fi) {                                        // acercándose, en fila o en la talanquera
+    let d;
+    if (t < ll) { d = (i - hechos(ll)) * PASO_FILA + (ll - t) * V_APROX; dq[i] = d; }
+    else { const obj = (i - hechos(t)) * PASO_FILA; dq[i] = (salto || dq[i] < 0) ? obj : Math.max(obj, dq[i] - 4.5 * dts); d = dq[i]; }
+    const p = enRuta(rutaFila, d); O.x = p.x; O.z = p.z; O.ang = Math.atan2(p.dz, -p.dx); return O;
+  }
+  if (A.cupo[i] < 0) {                                 // sin cupo: da la vuelta y se va a otro parqueadero
+    const d = (t - fi) * V_DESVIO; if (d > 150) return null;
+    const p = enRuta(rutaDesvio, d); O.x = p.x; O.z = p.z; O.ang = Math.atan2(-p.dz, p.dx); O.desvio = true; return O;
+  }
+  const R = rutasDe(i), pa = A.parq[i], sa = A.sal[i];
+  if (t < pa) { const u = (t - fi) / (pa - fi), p = enRuta(R.ida, (1 - Math.pow(1 - u, 1.5)) * R.ida.largo); O.x = p.x; O.z = p.z; O.ang = Math.atan2(-p.dz, p.dx); return O; }
+  if (sa == null || t < sa) { O.x = R.c.x; O.z = R.c.z; O.ang = Math.atan2(-R.c.hz, R.c.hx); return O; }
+  const te = t - sa;
+  if (te < T_REVERSA) { const p = enRuta(R.rev, suave(te / T_REVERSA) * R.rev.largo); O.x = p.x; O.z = p.z; O.ang = Math.atan2(p.dz, -p.dx); return O; }
+  const d = (te - T_REVERSA) * V_SALIDA; if (d > R.sal.largo - 190) return null;
+  const p = enRuta(R.sal, d); O.x = p.x; O.z = p.z; O.ang = Math.atan2(-p.dz, p.dx); return O;
+}
+
+// ---------------------------------------------------------------- luz según la hora
+const CLAVES = [ // hora, cielo, color sol, intensidad sol, intensidad ambiente, focos
+  [5.0, 0x1b2845, 0x8fa3d9, 0.25, 0.75, 1.0], [5.7, 0x4b4f80, 0xffb07a, 0.9, 1.0, 1.0], [6.3, 0xf0b98c, 0xffc48a, 2.0, 1.5, 0.3],
+  [7.2, 0xa9d6f5, 0xfff0da, 3.0, 2.0, 0.0], [12.5, 0x86c5f4, 0xffffff, 3.4, 2.2, 0.0]];
+const c1 = new THREE.Color(), c2 = new THREE.Color();
+function iluminar(hora) {
+  let k = 0; while (k < CLAVES.length - 2 && hora > CLAVES[k + 1][0]) k++;
+  const a = CLAVES[k], b = CLAVES[k + 1], u = Math.max(0, Math.min(1, (hora - a[0]) / (b[0] - a[0])));
+  c1.setHex(a[1]).lerp(c2.setHex(b[1]), u); scene.background.copy(c1); scene.fog.color.copy(c1);
+  sol.color.setHex(a[2]).lerp(c2.setHex(b[2]), u);
+  sol.intensity = a[3] + (b[3] - a[3]) * u; hemi.intensity = a[4] + (b[4] - a[4]) * u;
+  const foco = a[5] + (b[5] - a[5]) * u; matFoco.emissiveIntensity = foco * 2.2; luzEntrada.intensity = foco * 200;
+  // el sol sale por el oriente (+x) y sube hacia el mediodía
+  const elev = THREE.MathUtils.degToRad(Math.max(14, Math.min(78, (hora - 5.4) * 11.5)));
+  const az = THREE.MathUtils.degToRad(-25 + (hora - 5) * 5);
+  sol.position.set(CX + Math.cos(elev) * Math.cos(az) * 320, Math.sin(elev) * 320, CZ + Math.cos(elev) * Math.sin(az) * 320 + 40);
+}
+
+// ---------------------------------------------------------------- línea de tiempo (ocupación del día)
+const linea = $('linea'), gl = linea.getContext('2d');
+const serie = []; for (let t = 0; t <= H; t += 60) serie.push(ocupEn(t));
+function pintarLinea(t) {
+  const r = linea.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+  if (linea.width !== Math.round(r.width * dpr)) { linea.width = Math.round(r.width * dpr); linea.height = Math.round(r.height * dpr); }
+  const w = linea.width, h = linea.height, base = h - 13 * dpr, alto = base - 4 * dpr;
+  gl.clearRect(0, 0, w, h);
+  const y = v => base - (v / Math.max(C, 1)) * alto;
+  gl.beginPath(); gl.moveTo(0, base); serie.forEach((v, k) => gl.lineTo(k / (serie.length - 1) * w, y(v))); gl.lineTo(w, base); gl.closePath();
+  gl.fillStyle = 'rgba(56,189,248,.28)'; gl.fill();
+  gl.beginPath(); serie.forEach((v, k) => k ? gl.lineTo(k / (serie.length - 1) * w, y(v)) : gl.moveTo(0, y(v))); gl.strokeStyle = '#38bdf8'; gl.lineWidth = 1.6 * dpr; gl.stroke();
+  gl.setLineDash([4 * dpr, 4 * dpr]); gl.beginPath(); gl.moveTo(0, y(C)); gl.lineTo(w, y(C)); gl.strokeStyle = 'rgba(248,113,113,.9)'; gl.lineWidth = dpr; gl.stroke(); gl.setLineDash([]);
+  gl.fillStyle = '#cbd5e1'; gl.font = `${10 * dpr}px system-ui, sans-serif`; gl.textBaseline = 'bottom';
+  const horas = H / 3600;
+  for (let k = 0; k <= horas; k++) { const x = k / horas * w; gl.textAlign = k === 0 ? 'left' : k >= horas ? 'right' : 'center'; gl.fillText(`${D.hora_inicio + k}:00`, x, h); gl.fillRect(Math.min(x, w - dpr), base, dpr, 3 * dpr); }
+  const x = Math.min(1, t / H) * w; gl.fillStyle = '#f8fafc'; gl.fillRect(x - dpr, 0, 2 * dpr, base);
+  gl.beginPath(); gl.arc(x, y(ocupEn(t)), 3.5 * dpr, 0, 6.3); gl.fill();
+}
+
+// ---------------------------------------------------------------- reloj y controles
+let tSim = 0, velocidad = 120, corriendo = true, salto = true, arrastrando = false;
+$('titulo').textContent = D.titulo || 'Gemelo digital';
+const btn = $('play');
+const marcar = () => { btn.textContent = corriendo ? '❚❚' : '▶'; };
+btn.addEventListener('click', () => { if (!corriendo && tSim >= H) { tSim = 0; salto = true; } corriendo = !corriendo; marcar(); });
+$('vel').addEventListener('change', e => { velocidad = +e.target.value; });
+window.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); btn.click(); } });
+const mover = e => { const r = linea.getBoundingClientRect(); tSim = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * H; salto = true; };
+linea.addEventListener('pointerdown', e => { arrastrando = true; mover(e); try { linea.setPointerCapture(e.pointerId); } catch (_) {} });
+linea.addEventListener('pointermove', e => { if (arrastrando) mover(e); });
+linea.addEventListener('pointerup', () => { arrastrando = false; });
+linea.addEventListener('pointercancel', () => { arrastrando = false; });
+
+window.gemelo = { irA: seg => { tSim = Math.max(0, Math.min(H, seg)); salto = true; }, pausar: () => { corriendo = false; marcar(); }, vista: irA };
+
+function ajustar() { const w = cont.clientWidth || window.innerWidth, h = cont.clientHeight || window.innerHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+window.addEventListener('resize', ajustar); ajustar();
+
+const elOcup = $('ocup'), elBarra = $('barra'), elLibres = $('libres'), elFila = $('enfila'), elDesv = $('desv'), elDest = $('dest'), elReloj = $('reloj');
+let ledPrevio = -1, anguloBrazo = 0, previo = performance.now();
+const CERO = new THREE.Matrix4().makeScale(0, 0, 0);
+
+function cuadro(ahora) {
+  requestAnimationFrame(cuadro);
+  const dtr = Math.min(0.1, (ahora - previo) / 1000); previo = ahora;
+  let dts = 0;
+  if (corriendo && !arrastrando) { dts = dtr * velocidad; tSim += dts; if (tSim >= H) { tSim = H; corriendo = false; marcar(); } }
+  const t = tSim;
+
+  let nEt = 0;
+  for (let i = 0; i < N; i++) {
+    const p = pose(i, t, dts, salto);
+    if (!p) { carroceria.setMatrixAt(i, CERO); detalles.setMatrixAt(i, CERO); continue; }
+    const e = escala[i]; tmp.position.set(p.x, 0, p.z); tmp.rotation.set(0, p.ang, 0); tmp.scale.set(e[0], e[1], e[2]); tmp.updateMatrix();
+    carroceria.setMatrixAt(i, tmp.matrix); detalles.setMatrixAt(i, tmp.matrix);
+    if (p.desvio && nEt < etiquetas.length) { const s = etiquetas[nEt++]; s.material.map = texDest[A.dest[i]]; s.position.set(p.x, 4.6, p.z); s.visible = true; }
+  }
+  for (let k = nEt; k < etiquetas.length; k++) etiquetas[k].visible = false;
+  carroceria.instanceMatrix.needsUpdate = true; detalles.instanceMatrix.needsUpdate = true;
+  salto = false;
+
+  const k = hechos(t) - 1, abierta = k >= 0 && t - A.fin[k] < 3.2 && A.cupo[k] >= 0;
+  anguloBrazo += ((abierta ? 1.35 : 0) - anguloBrazo) * Math.min(1, dtr * (velocidad > 200 ? 30 : 9)); brazo.rotation.x = anguloBrazo;
+
+  const ocup = ocupEn(t), libres = C - ocup, enFila = cuantos(A.lleg, t) - hechos(t);
+  const porDest = desvT.map(a => cuantos(a, t)), desv = porDest.reduce((a, b) => a + b, 0);
+  elOcup.textContent = `${ocup} / ${C}`; elLibres.textContent = libres; elFila.textContent = enFila; elDesv.textContent = desv;
+  elBarra.style.width = (100 * ocup / Math.max(C, 1)) + '%';
+  elBarra.style.background = libres <= 0 ? 'var(--lleno)' : ocup / C > 0.85 ? 'var(--alerta)' : 'var(--ok)';
+  elDest.innerHTML = D.destinos.map((n, j) => `<span>${n} <b>${porDest[j]}</b></span>`).join('');
+  const seg = Math.floor(t), hh = D.hora_inicio + Math.floor(seg / 3600), mm = Math.floor(seg % 3600 / 60);
+  elReloj.textContent = `${hh}:${String(mm).padStart(2, '0')}`;
+  if (libres !== ledPrevio) { pintarLed(libres); ledPrevio = libres; }
+
+  iluminar(D.hora_inicio + t / 3600);
+  pintarLinea(t);
+  if (transicion) { transicion.u = Math.min(1, transicion.u + dtr / 0.9); const u = suave(transicion.u);
+    camera.position.lerpVectors(transicion.p0, transicion.p1, u); controls.target.lerpVectors(transicion.o0, transicion.o1, u); if (transicion.u >= 1) transicion = null; }
+  controls.update();
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(cuadro);
+</script>
+</body>
+</html>
