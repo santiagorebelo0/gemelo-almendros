@@ -4,6 +4,7 @@ Proyecto final de Teoría de Probabilidades (Pontificia Universidad Javeriana Ca
 Néstor Acosta, José Luis Canchala y José Santiago Rebelo.
 
 - Tablero Streamlit en línea: https://gemelo-almendros.streamlit.app
+- Tablero Shiny en línea: https://santiagorebelo0.shinyapps.io/gemelo-almendros/
 - Tablero Shiny desde R: `shiny::runGitHub("gemelo-almendros", "santiagorebelo0")`
 
 Simula la entrada y la ocupación del parqueadero Almendros entre las 5:00 y las 12:00 de un
@@ -100,7 +101,7 @@ shiny::runGitHub("gemelo-almendros", "santiagorebelo0")
 source("herramientas/desplegar_shiny.R")
 ```
 
-Queda en `https://TU-CUENTA.shinyapps.io/gemelo-almendros/`. Para actualizarla después de un
+Queda en `https://santiagorebelo0.shinyapps.io/gemelo-almendros/`. Para actualizarla después de un
 cambio, vuelve a ejecutar el paso 3.
 
 Alternativa sin token: en https://connect.posit.cloud se inicia sesión con GitHub, se elige

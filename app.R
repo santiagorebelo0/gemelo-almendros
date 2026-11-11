@@ -225,7 +225,7 @@ server <- function(input, output, session) {
     r <- res(); h <- hora_ref()
     caja <- function(titulo, valor) value_box(title = span(class = "small", titulo), value = valor, theme = "light", min_height = "104px")
     layout_column_wrap(
-      width = 1 / 5, class = "mb-3",
+      width = "170px", class = "mb-3",     # se reacomoda en pantallas angostas
       caja(sprintf("P(lleno antes de %s)", hora_texto(h)), sprintf("%.0f%%", 100 * prob_lleno_antes(r, h))),
       caja("Hora esperada de llenado", hora_texto(r$hora_lleno_media)),
       caja("Vehículos desviados", sprintf("%.1f", r$desv_media)),
