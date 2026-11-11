@@ -64,7 +64,7 @@ La escena 3D descarga Three.js de un CDN, así que necesita conexión a internet
 ## Subir a GitHub
 
 1. En https://github.com/new crea un repositorio **público** y **vacío** llamado `gemelo-almendros`.
-2. En una terminal dentro de esta carpeta (cambia `santiagorebelo0` por tu usuario de GitHub):
+2. En una terminal dentro de esta carpeta:
 
 ```bash
 git init
